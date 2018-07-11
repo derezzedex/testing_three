@@ -1,5 +1,5 @@
-# first_three_js
-My first Three.js project.
+# testing_three
+Side project of THREE.js to test some of the features in a local playground.
 
 ## Installing dependencies
 

@@ -1,7 +1,7 @@
 {
-  "name": "first_three_js",
+  "name": "testing_three",
   "version": "1.0.0",
-  "description": "My first THREE.js game.",
+  "description": "THREE.js playground.",
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -9,7 +9,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/derezzedex/first_three_js.git"
+    "url": "git+https://github.com/derezzedex/testing_three.git"
   },
   "keywords": [
     "three.js",
@@ -19,9 +19,9 @@
   "author": "derezzedex",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/derezzedex/first_three_js/issues"
+    "url": "https://github.com/derezzedex/testing_three/issues"
   },
-  "homepage": "https://github.com/derezzedex/first_three_js#readme",
+  "homepage": "https://github.com/derezzedex/testing_three#readme",
   "dependencies": {
     "express": "^4.16.3",
     "socket.io": "^2.1.1",

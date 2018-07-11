@@ -29,6 +29,8 @@ class Game {
         window.addEventListener( 'resize', this.onWindowResize.bind(this), false );
 
         this.keyboard = new KeyboardState();
+        
+        this.latency = 0;
 
         this.q0 = new THREE.Quaternion();
         this.q1 = new THREE.Quaternion();
@@ -59,9 +61,6 @@ class Game {
         });
         this.cube = new THREE.Mesh(geometry,material);
 
-        this.last_q = new THREE.Quaternion().copy(this.cube.quaternion);
-        this.next_q = new THREE.Quaternion().copy(this.cube.quaternion);
-
         this.scene.add(this.cube);
 
         this.axes = new THREE.AxesHelper();
@@ -71,17 +70,19 @@ class Game {
 
         this.camera.position.z = 5;
 
-        this.socket = io.connect("http://localhost:3000");
-        this.socket.on("updateQuat", this.update_quaternion.bind(this));
+        this.setup_network("localhost");
 
         this.current_time = performance.now();
     }
-
-    update_quaternion(data){
-        this.server_q.x = data.quaternion._x;
-        this.server_q.y = data.quaternion._y;
-        this.server_q.z = data.quaternion._z;
-        this.server_q.w = data.quaternion._w;
+    
+    latency_update(ms){
+        this.latency = ms;
+        this.socket.emit("ping_back", {ping: ms});
+    }
+    
+    setup_network(ip = "localhost", port = "3000"){
+        this.socket = io.connect("http://"+ip+":"+port);
+        this.socket.on("pong", this.latency_update.bind(this));
     }
 
     handle_input() {
@@ -91,17 +92,11 @@ class Game {
         if (this.keyboard.pressed("A")){
             this.should_rotate = true;
             this.rotate = this.axis_x;
-            this.socket.emit('keyPress', {key_id: "A", state: true, skip_ticks: this.skip_ticks});
-        } else {
-            this.socket.emit('keyPress', {key_id: "A", state: false, skip_ticks: this.skip_ticks});
         }
 
         if (this.keyboard.pressed("D")){
             this.should_rotate = true;
             this.rotate = this.axis_z;
-            this.socket.emit('keyPress', {key_id: "D", state: true, skip_ticks: this.skip_ticks});
-        } else {
-            this.socket.emit('keyPress', {key_id: "D", state: false, skip_ticks: this.skip_ticks});
         }
     }
 
@@ -119,8 +114,8 @@ class Game {
     draw() {
 
         this.alpha = 1.0 - ((this.next_game_tick - this.current_time) / this.skip_ticks);
-        this.cube.quaternion.copy(this.server_q);
-        //this.cube.quaternion.slerp(this.q1, this.alpha);
+        this.cube.quaternion.copy(this.q0);
+        this.cube.quaternion.slerp(this.q1, this.alpha);
 
         this.renderer.render(this.scene, this.camera);
     }
