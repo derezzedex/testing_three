@@ -2,11 +2,16 @@ class Game {
 
     constructor() {
         this.scene = new THREE.Scene();
-        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.scene.background = new THREE.Color(0xdbebfa);
+        
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1512);
         this.camera.aspect = window.innerWidth / window.innerHeight;
 
         this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.BasicShadowMap;
+        
         document.body.appendChild(this.renderer.domElement);
 
         this.stats = new Stats();
@@ -46,12 +51,61 @@ class Game {
         this.max_frame_skip = 10;
         this.next_game_tick = performance.now();
     }
+    
+    createTerrain(){
+        var generateHeight = function( width, height ) {
+            var data = new Uint8Array( width * height ), perlin = new ImprovedNoise(),
+            size = width * height, quality = 2, z = Math.random() * 100;
+            for ( var j = 0; j < 4; j ++ ) {
+                quality *= 4;
+                for ( var i = 0; i < size; i ++ ) {
+                    var x = i % width, y = ~~ ( i / width );
+                    data[ i ] += Math.abs( perlin.noise( x / quality, y / quality, z ) * 0.5 ) * quality + 10;
+                }
+            }
+            return data;
+        }
+        
+        var data = generateHeight(1024, 1024);
+        var material = new THREE.MeshPhongMaterial({color: 0x63B200, wireframe: false});
+        material.flatShading = true;
+        
+        var quality = 8,
+            step = 1024 / quality;
+        
+        var geometry = new THREE.PlaneGeometry(2000, 2000, quality -1, quality -1);
+        geometry.rotateX(- Math.PI / 2);
+        
+        for (var i=0, l=geometry.vertices.length; i < l; i++){
+            var x = i % quality,
+                y = Math.floor(i / quality);
+            geometry.vertices[i].y = data[(x*step)+(y*step)*1024] * 2 - 128;
+        }
+        
+        //geometry.computeFlatVertexNormals();
+        this.terrainMesh = new THREE.Mesh(geometry, material);
+        this.terrainMesh.castShadow = true;
+        this.scene.add(this.terrainMesh);
+    }
 
     onWindowResize(){
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
 
         this.renderer.setSize( window.innerWidth, window.innerHeight );
+    }
+    
+    createLights(){
+        this.pointLight = new THREE.PointLight(0xFDB813, 1.5, 1408);
+        this.pointLight.castShadow = true;
+        this.pointLight.position.x = 0;
+        this.pointLight.position.y = 1024;
+        this.pointLight.position.z = 0;
+        this.scene.add(this.pointLight);
+        
+        this.ambLight = new THREE.AmbientLight(0xffebcd);
+        this.scene.add(this.ambLight);
+    
     }
 
     init() {
@@ -60,15 +114,20 @@ class Game {
             color: 0xff9999
         });
         this.cube = new THREE.Mesh(geometry,material);
-
-        this.scene.add(this.cube);
-
+        //this.scene.add(this.cube);
+        this.createTerrain();
+        
         this.axes = new THREE.AxesHelper();
         this.axis_x = new THREE.Vector3(0,-1,0).normalize();
         this.axis_z = new THREE.Vector3(0,1,0);
         this.scene.add(this.axes);
+        
+        this.createLights();
 
-        this.camera.position.z = 5;
+        this.camera.position.x = 512;
+        this.camera.position.y = 768;
+        this.camera.position.z = 512;
+        this.camera.lookAt(0, 0, 0);
 
         this.setup_network("localhost");
 

@@ -26,7 +26,7 @@ io.sockets.on("connection", function(socket){
 	});
 	
 	socket.on('ping_back', function(data){
-		console.log(socket.id+": "+data.ping);
+		//console.log(socket.id+": "+data.ping);
 	});
 	
 });
