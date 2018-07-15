@@ -1,8 +1,8 @@
 class Game {
 
     constructor() {
-        this.sky_color = 0xdbebfa;
-        this.ground_color = 0x63b200;
+        this.sky_color = 0x000000;
+        this.ground_color = 0xffffff;
         this.sun_color = 0xfdb813;
         this.fog_color = 0xdfddd6;
         
@@ -78,110 +78,135 @@ class Game {
         this.renderer.setSize( window.innerWidth, window.innerHeight );
     }
     
-    createSky(){
-        this.sky_vs = document.getElementById("vertexShader").textContent;
-        this.sky_vf = document.getElementById("fragmentShader").textContent;
-        
-        this.sky_uniforms = {
-            topColor:    { type: "c", value: new THREE.Color( 0x0077ff ) },
-            bottomColor: { type: "c", value: new THREE.Color( 0xffffff ) },
-            offset:      { type: "f", value: 33 },
-            exponent:    { type: "f", value: 0.6 }
-        }
-        this.sky_uniforms.topColor.value.copy(this.hemiLight.color);
-        
-        this.scene.fog.color.copy(this.sky_uniforms.bottomColor.value);
-        
-        this.sky_geo = new THREE.SphereGeometry(8000, 32, 15);
-        this.sky_mat = new THREE.ShaderMaterial( { vertexShader: this.sky_vs, fragmentShader: this.sky_fs, uniforms: this.sky_uniforms, side: THREE.BackSide } );
-        
-        this.sky = new THREE.Mesh(this.sky_geo, this.sky_mat);
-        this.scene.add(this.sky);
-    }
-    
-    createLights(){
-        this.hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.05);
-        this.hemiLight.color.setHSL(0.6, 1, 0.6);
-        this.hemiLight.groundColor.setHSL(0.095, 1, 0.75);
-        this.scene.add(this.hemiLight);
-        
-        this.sunLight = new THREE.DirectionalLight(0xffffff, 1);
-        this.sunLight.color.setHSL(0.1, 1, 0.95);
-        this.sunLight.position.set(-1, 0.75, 1);
-        this.sunLight.position.multiplyScalar(50);
-        this.scene.add(this.sunLight);
-        
-        this.sunLight.castShadow = true;
-        this.sunLight.shadow.mapSize.width = this.sunLight.shadow.mapSize.height = 1024*2;
-        
-        this.d = 30;
-        this.sunLight.shadow.camera.left = -this.d;
-        this.sunLight.shadow.camera.right = this.d;
-        this.sunLight.shadow.camera.top = this.d;
-        this.sunLight.shadow.camera.bottom = -this.d;
-        
-        this.sunLight.shadow.camera.Far = 3500;
-        this.sunLight.shadow.bias = -0.000001;
-        this.sunLight.shadow.darkness = 0.35;
-        this.scene.add(this.sunLight);
-    }
-    
     createTerrain(){
         var generateHeight = function( width, height ) {
+            /*
+            var data = new Uint8Array( width * height ), perlin = new ImprovedNoise(),
+            size = width * height, quality = 2, z = Math.random() * 100;
+            for ( var j = 0; j < 4; j ++ ) {
+                quality *= 4;
+                for ( var i = 0; i < size; i ++ ) {
+                    var x = i % width, y = ~~ ( i / width );
+                    data[ i ] += Math.abs( perlin.noise( x / quality, y / quality, z ) * 0.5 ) * quality + 10;
+                }
+            }
+            */
+            
+            var map_range = function(x, a, b, c, d){
+                return (x - a) * ((d-c)/(b-a)) + c;
+            }
             
             var size = width * height, 
                 z = Math.random() * 100;
             
             var data = new Uint8Array(size);
-            var perlin = new ImprovedNoise();
-            var quality = 2;
-            for (var j=0; j<4; j++){
-                quality *= 2;
-                for (var i=0; i < size; i++){
-                    var x = i % width,
-                        y = ~~ (i / height);
+            
+            var seed = Math.random();
+            var noise = new Noise(seed);
+            
+            var image_data = new Uint8Array(width*height*4);
+            
+            for (var x=0; x < width; x++){
+                for (var y=0; y < height; y++){
 
-                    var nx = x/quality - 0.5,
-                        ny = y/quality - 0.5;
-                    data[i] += perlin.noise(nx, ny, z) * quality + 10;
-
+                    //var nx = x/quality - 0.5,
+                    //    ny = y/quality - 0.5;
+                    
+                    var v_noise = noise.perlin2(x/250, y/250);
+                    var value = map_range(v_noise, -1, 1, 0, 40); // -1, 1 range to 0, 20 range
+                    if (x == 0 && y <= 4){
+                        console.log(x +", "+y+":"+value);
+                    }
+                    
+                    data[y*width + x] = value;
+                    
+                    var offset = (x + y * width) * 4;
+                    var color = map_range(value, 0, 40, 0, 255); // elevation range to color range
+                    image_data[offset + 0] = color;
+                    image_data[offset + 1] = color;
+                    image_data[offset + 2] = color;
+                    image_data[offset + 3] = 0xff;
                 }
             }
-            return data;
+            
+            return {noise: data, image: {data: image_data, width: width, height: height}};
         }        
         
-        var data = generateHeight(1024, 1024);
+        var noise = generateHeight(1024, 1024);
+        var data = noise["noise"];
+        var image_data = noise["image"];
+        
+        this.setupImage(image_data);
 
-        //var image_data = new THREE.TextureLoader().load("test.png");
-        var material = new THREE.MeshLambertMaterial({color: this.ground_color, wireframe: false}); // color: this.ground_color
+        var data_tex = new THREE.DataTexture(image_data["data"], 1024, 1024, THREE.RGBAFormat);
+        data_tex.needsUpdate = true;
+        data_tex.center.x = 0.5;
+        data_tex.center.y = 0.5;
+        data_tex.rotation = Math.PI;
+        data_tex.repeat.x = -1;
+        
+        var material = new THREE.MeshBasicMaterial({map: data_tex, wireframe: false}); //Lambert
         material.flatShading = true;
         
         var quality = 16,
             step = 1024 / quality;
         
-        var geometry = new THREE.PlaneGeometry(2000, 2000, quality -1, quality -1);
+        var geometry = new THREE.PlaneGeometry(2000, 2000, 15, 15);
         geometry.dynamic = true;
         geometry.rotateX(- Math.PI / 2);
         
         for (var i=0, l=geometry.vertices.length; i < l; i++){
             var x = i % quality,
                 y = Math.floor(i / quality);
-            geometry.vertices[i].y = data[(x*step)+(y*step)*1024] * 2 - 128;
+            geometry.vertices[i].y = data[(x*step)+(y*step)*1024] * 16;
         }
+        
         
         //geometry.computeFlatVertexNormals();
         this.terrainMesh = new THREE.Mesh(geometry, material);
         this.terrainMesh.castShadow = true;
         this.scene.add(this.terrainMesh);
     }
+    
+    setupImage(data){
+        this.sceneOrtho = new THREE.Scene();
+        this.cameraOrtho = new THREE.OrthographicCamera(0, window.innerWidth, window.innerHeight, 0, -10, 10);
+        var image_data = data["data"],
+            width = data["width"],
+            height = data["height"];
+        var sprite_map = new THREE.DataTexture(image_data, width, height, THREE.RGBAFormat);
+        sprite_map.needsUpdate = true;
+        //sprite_map.magFilter = THREE.NearestFilter;
+        //sprite_map.minFilter = THREE.NearestFilter;
+        var sprite_mat = new THREE.SpriteMaterial({map: sprite_map, color: 0xffffff});
+        var sprite_width = 256,
+            sprite_height = 196;
+        var sprite_x = window.innerWidth - (sprite_width / 2),
+            sprite_y = window.innerHeight - (sprite_height / 2);
+        
+        sprite_x -= (sprite_width / 4);
+        sprite_y -= (sprite_height / 4);
+        
+        this.sprite = new THREE.Sprite(sprite_mat);
+        this.sprite.scale.set(sprite_width, sprite_height, 0);
+        this.sprite.position.set(sprite_x, sprite_y, -10);
+        this.sceneOrtho.add(this.sprite);
+    }
 
     init() {
-        this.createTerrain();        
-        this.createLights();
-        this.createSky();
-
+        this.light = new THREE.DirectionalLight(0xffffff, 1);
+        this.light.position.set(512, 512, 512);
+        this.light.lookAt(512, 0, 512);
         
-        this.camera.position.y = 512;
+        this.scene.add(this.light);
+        
+        this.createTerrain();
+        
+        this.camera.position.x = 1344;
+        this.camera.position.y = 896;
+        this.camera.position.z = -1344;
+        this.camera.lookAt(0, 0, 0);
+        
         /*
         this.camera.position.y = 768;
         this.camera.position.z = 512;
@@ -202,38 +227,6 @@ class Game {
         this.socket = io.connect("http://"+ip+":"+port);
         this.socket.on("pong", this.latency_update.bind(this));
     }
-
-    updateSun(delta){
-        var nsin = Math.sin(delta);
-        var ncos = Math.cos(delta);
-        
-        this.sunLight.position.set( 1500*nsin, 2000*nsin, 2000*ncos);
-        this.terrainMesh.geometry.computeFlatVertexNormals();
-        if (nsin > 0.2 )   // day
-        {
-            this.sky.material.uniforms.topColor.value.setRGB(0.25,0.55,1);
-            this.sky.material.uniforms.bottomColor.value.setRGB(1,1,1);
-            var f = 1;
-            this.sunLight.intensity = f;
-            this.sunLight.shadow.darkness = f*0.7;
-        }
-        else if (nsin < 0.2 && nsin > 0.0 )
-        {
-            var f = nsin/0.2;
-            this.sunLight.intensity = f;
-            this.sunLight.shadow.darkness = f*0.7;
-            this.sky.material.uniforms.topColor.value.setRGB(0.25*f,0.55*f,1*f);
-            this.sky.material.uniforms.bottomColor.value.setRGB(1*f,   1*f,1*f);
-        }
-        else  // night
-        {
-            var f = 0;
-            this.sunLight.intensity = f;
-            this.sunLight.shadow.darkness = f*0.7;
-            this.sky.material.uniforms.topColor.value.setRGB(0,0,0);
-            this.sky.material.uniforms.bottomColor.value.setRGB(0,0,0);
-        }
-    }
     
     handle_input() {
         this.keyboard.update();
@@ -241,15 +234,12 @@ class Game {
 
     gameTick() {
         //this.controls.update();
-        //this.time += (0.1/1000)*this.skip_ticks;
-        if (this.time >= 4)
-            this.time = 0;
-        
-        this.updateSun(this.time);
     }
 
     draw() {
         this.renderer.render(this.scene, this.camera);
+        this.renderer.autoClear = false;
+        this.renderer.render(this.sceneOrtho, this.cameraOrtho);
     }
 
     run() {

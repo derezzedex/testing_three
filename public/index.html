@@ -3,7 +3,21 @@
 		<title>My first three.js app</title>
 		<style>
 			body { margin: 0; }
-			canvas { width: 100%; height: 100% }
+            #wrapper{
+                position: relative;
+                width: 100%;
+                height: 100%;
+            }
+        
+			#threejs, #canvas2d{ 
+                position: absolute;
+                top: 0px; left: 0px;
+            }
+            
+            #threejs{
+                width: 100%; 
+                height: 100%;
+            }
 		</style>
         <script type="x-shader/x-vertex" id="vertexShader">
             varying vec3 worldPosition;
@@ -27,6 +41,11 @@
         </script>
 	</head>
 	<body>
+        <div id="wrapper">
+            <canvas id="canvas2d" width="320" height="480"></canvas>
+            <canvas id="threejs"></canvas>
+        </div>
+        
 		<script src="libraries/js/three.js"></script>
 		<script src="libraries/js/keyboard_state.js"></script>
         
