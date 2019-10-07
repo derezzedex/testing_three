@@ -127,48 +127,74 @@ class Game {
     }
     
     createTerrain(){
-        var generateHeight = function( width, height ) {
-            
-            var size = width * height, 
-                z = Math.random() * 100;
-            
-            var data = new Uint8Array(size);
-            var perlin = new ImprovedNoise();
-            var quality = 2;
-            for (var j=0; j<4; j++){
-                quality *= 2;
-                for (var i=0; i < size; i++){
-                    var x = i % width,
-                        y = ~~ (i / height);
+      var image_data = new Uint8Array(1024*1024*4);
+      var generateHeight = function( width, height ) {
+          var data = new Uint8Array( width * height ), perlin = new ImprovedNoise(),
+          size = width * height, quality = 2, z = Math.random() * 300;
+          for ( var j = 0; j < 4; j ++ ) {
+              quality *= 4;
+              for ( var i = 0; i < size; i ++ ) {
+                  var x = i % width, y = ~~ ( i / width );
+                  // var value = Math.abs( perlin.noise( x / quality *1.1, y / quality *1.1, z ) * 0.6 ) * quality;
+                  data[ i ] +=  Math.abs( perlin.noise( x / quality, y / quality, z ) * 0.5 ) * quality;
 
-                    var nx = x/quality - 0.5,
-                        ny = y/quality - 0.5;
-                    data[i] += perlin.noise(nx, ny, z) * quality + 10;
+                  var offset = (x + y * width) * 4;
+                  if (data[i] <= 10){ //#0097e6
+                    image_data[offset + 0] = 0x00;
+                    image_data[offset + 1] = 0x97;
+                    image_data[offset + 2] = 0xe6;
+                    image_data[offset + 3] = 0xff;
+                  }else if (data[i] >= 10 && data[i] <= 15){ //#dcdde1
+                    image_data[offset + 0] = 0xdc;
+                    image_data[offset + 1] = 0xdd;
+                    image_data[offset + 2] = 0xe1;
+                    image_data[offset + 3] = 0xff;
+                  }else if (data[i] >= 15 && data[i] <= 60){ //#44bd32
+                    image_data[offset + 0] = 0x44;
+                    image_data[offset + 1] = 0xbd;
+                    image_data[offset + 2] = 0x32;
+                    image_data[offset + 3] = 0xff;
+                  }else if (data[i] >= 6 && data[i] <= 140){ //#013220
+                    image_data[offset + 0] = 0x01;
+                    image_data[offset + 1] = 0x32;
+                    image_data[offset + 2] = 0x20;
+                    image_data[offset + 3] = 0xff;
+                  }else{//#FFFAFA
+                    image_data[offset + 0] = 0xff;
+                    image_data[offset + 1] = 0xfa;
+                    image_data[offset + 2] = 0xfa;
+                    image_data[offset + 3] = 0xff;
+                  }
+              }
+          }
+          return data;
+      }
 
-                }
-            }
-            return data;
-        }        
-        
         var data = generateHeight(1024, 1024);
 
         //var image_data = new THREE.TextureLoader().load("test.png");
-        var material = new THREE.MeshLambertMaterial({color: this.ground_color, wireframe: false}); // color: this.ground_color
+        var data_tex = new THREE.DataTexture(image_data, 1024, 1024, THREE.RGBAFormat);
+        data_tex.needsUpdate = true;
+        data_tex.center.x = 0.5;
+        data_tex.center.y = 0.5;
+        data_tex.rotation = Math.PI;
+        data_tex.repeat.x = -1;
+        var material = new THREE.MeshLambertMaterial({map: data_tex, wireframe: false}); // color: this.ground_color
         material.flatShading = true;
-        
-        var quality = 16,
+
+        var quality = 64,
             step = 1024 / quality;
-        
+
         var geometry = new THREE.PlaneGeometry(2000, 2000, quality -1, quality -1);
         geometry.dynamic = true;
         geometry.rotateX(- Math.PI / 2);
-        
+
         for (var i=0, l=geometry.vertices.length; i < l; i++){
             var x = i % quality,
                 y = Math.floor(i / quality);
-            geometry.vertices[i].y = data[(x*step)+(y*step)*1024] * 2 - 128;
+            geometry.vertices[i].y = data[(x*step)+(y*step)*1024] * 2 - 32;
         }
-        
+
         //geometry.computeFlatVertexNormals();
         this.terrainMesh = new THREE.Mesh(geometry, material);
         this.terrainMesh.castShadow = true;
